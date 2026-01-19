@@ -101,17 +101,32 @@ function intializeByteVocab(vocab: Vocabulary): void {
 }
 
 function tokenToBytes(token: string): number[] {
-    // Case 1: Hex byte token like "<0x0a>" → parse and return single byte
-    if (token.startsWith('<0x') && token.endsWith('>')) {
-        const hex = token.slice(3, -1);  // Extract "0a" from "<0x0a>"
-        return [parseInt(hex, 16)];       // Return [10]
-    }
-
-    // Case 2: Regular string like "low" → get byte for each character
+    // Handles merged tokens that may contain:
+    // - Multiple hex byte tokens: "<0xe4><0xbd>"
+    // - Mixed content: "e<0x0a>" or "<0x0a>e"
+    // - Pure ASCII: "low"
+    
     const bytes: number[] = [];
-    for (const char of token) {
-        bytes.push(char.charCodeAt(0));
+    let i = 0;
+    
+    while (i < token.length) {
+        // Check if we're at the start of a hex byte token <0xXX>
+        // Format is exactly 6 chars: <0x + 2 hex digits + >
+        if (
+            i + 5 < token.length &&
+            token.slice(i, i + 3) === '<0x' &&
+            token[i + 5] === '>'
+        ) {
+            const hex = token.slice(i + 3, i + 5);
+            bytes.push(parseInt(hex, 16));
+            i += 6; // Skip past "<0xXX>"
+        } else {
+            // Regular ASCII character
+            bytes.push(token.charCodeAt(i));
+            i++;
+        }
     }
+    
     return bytes;
 }
 

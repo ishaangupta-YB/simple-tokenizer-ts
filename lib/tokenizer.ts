@@ -118,14 +118,32 @@ export function initializeByteVocab(vocab: Vocabulary): void {
 }
 
 export function tokenToBytes(token: string): number[] {
-  if (token.startsWith("<0x") && token.endsWith(">")) {
-    const hex = token.slice(3, -1);
-    return [parseInt(hex, 16)];
-  }
+  // Handles merged tokens that may contain:
+  // - Multiple hex byte tokens: "<0xe4><0xbd>"
+  // - Mixed content: "e<0x0a>" or "<0x0a>e"
+  // - Pure ASCII: "low"
+
   const bytes: number[] = [];
-  for (const char of token) {
-    bytes.push(char.charCodeAt(0));
+  let i = 0;
+
+  while (i < token.length) {
+    // Check if we're at the start of a hex byte token <0xXX>
+    // Format is exactly 6 chars: <0x + 2 hex digits + >
+    if (
+      i + 5 < token.length &&
+      token.slice(i, i + 3) === "<0x" &&
+      token[i + 5] === ">"
+    ) {
+      const hex = token.slice(i + 3, i + 5);
+      bytes.push(parseInt(hex, 16));
+      i += 6; // Skip past "<0xXX>"
+    } else {
+      // Regular ASCII character
+      bytes.push(token.charCodeAt(i));
+      i++;
+    }
   }
+
   return bytes;
 }
 
@@ -247,7 +265,7 @@ export function decode(ids: number[], vocab: Vocabulary): string {
   return bytesToText(bytes);
 }
 
-// Default training data for the demo
+// Default training data for the demo (content from data.txt)
 export const DEFAULT_TRAINING_DATA = `In 2026, José said: "Hello, 世界! 👋🚀" while debugging const π = 3.14159; at 03:45 AM.
 His café bill was €12.50 (₹1045.75), uptime = 99.99%, latency ≤ 10 ms.
 Meanwhile العربية تُكتب من اليمين ← اليسار, हिंदी भी यहाँ है, and emojis like 🤖✨🔥 coexist with math ∑x², arrows → ⇄, and URLs such as https://example.com?q=テスト#α.
